@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdbool.h>
 
 #include "buddy.h"
 #include "list.h"
@@ -79,6 +80,19 @@ int max_ord = (1<<MAX_ORDER);
  * Local Functions
  **************************************************************************/
 
+void split(page_t* page, int order, int requested)
+{
+	if (order == requested)
+	{
+		return;
+	}
+	page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, order-1))];
+	buddy->order = order-1;
+	list_add(&(buddy->list), &free_area[order-1]);
+	split(page, order-1, requested);
+}
+ 
+ 
 /**
  * Initialize the buddy system
  */
@@ -88,7 +102,6 @@ void buddy_init()
 	int n_pages = (1<<MAX_ORDER) / PAGE_SIZE;
 	for (i = 0; i < n_pages; i++) {
 		/* TODO: INITIALIZE PAGE STRUCTURES */
-		INIT_LIST_HEAD(&g_pages[i].list);
 		g_pages[i].index = i;
 		g_pages[i].order = -1;
 		g_pages[i].addr = PAGE_TO_ADDR(i);
@@ -124,38 +137,31 @@ void *buddy_alloc(int size)
 	/* TODO: IMPLEMENT THIS FUNCTION */
 	
 	//make sure it is within the bounds that can be allocated
-	if (size > max_ord || size <= 0)
-	{
-		return NULL;
-	}
+	int req_order = -1;
 	
-	int req_order = ceil(log2(size));
+	 for (int i = MIN_ORDER; i <= MAX_ORDER; i++)
+	 {
+		 if((1<<i) >= size)
+		 {
+			 req_order = size;
+		 }
+	 }
+	 
+	 if (req_order == -1)
+	 {
+		 return NULL;
+	 }
 	
 	for (int i = req_order; i <= MAX_ORDER; i++)
 	{
 		//if empty block is found, break to right size
 		if (!list_empty(&free_area[i]))
 		{
-			page_t * left;
-			page_t * right;
-			int req_page_index;
-			void * req_page_addr;
-			
-			if (i == req_order)
-			{
-				left = list_entry(free_area[i].next, page_t, list);
-				list_del(&(left->list));
-			}
-			else
-			{
-				left = &g_pages[ADDR_TO_PAGE(buddy_alloc((1<<(req_order+1)))];
-				req_page_index = left->index + (1<<req_order)/PAGE_SIZE;
-				right = &g_pages[req_page_index];
-				list_add(&(right->list), &free_area[req_order]);
-			}
-			left->order = req_order;
-			req_page_addr = PAGE_TO_ADDR(left->index);
-			return req_page_addr;
+			page_t* page = list_entry(free_area[i].next, page_t, list);
+			list_del_init(&(page->list));
+			split(page, i, req_order);
+			page->order = req_order;
+			return page->addr;
 		}
 	}
 	return NULL;
@@ -173,6 +179,38 @@ void *buddy_alloc(int size)
 void buddy_free(void *addr)
 {
 	/* TODO: IMPLEMENT THIS FUNCTION */
+	page_t* page = &g_pages[ADDR_TO_PAGE(addr)];
+	int i;
+	
+	for ( i = page->order; i < MAX_ORDER; i++)
+	{
+		page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, i))];
+		bool freed = false;
+		struct list_head *list_position;
+		
+		list_for_each(list_position, &free_area[index])
+		{
+			if (list_entry(list_position, page_t, list) == buddy)
+			{
+				freed = true;
+			}
+		}
+		
+		if (freed)
+		{
+			break;
+		}
+		
+		list_del_init(&buddy->list);
+		
+		if(buddy<page)
+		{
+			page = buddy;
+		}
+		
+	}
+	page->order = i;
+	list_add(&page->list, &free_area[i]);
 }
 
 /**
@@ -193,3 +231,45 @@ void buddy_dump()
 	}
 	printf("\n");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
