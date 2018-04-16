@@ -184,13 +184,13 @@ void buddy_free(void *addr)
 	
 	for ( i = page->order; i < MAX_ORDER; i++)
 	{
-		page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, i))];
+		page_t* page_buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, i))];
 		bool freed = false;
 		struct list_head *list_position;
 		
 		list_for_each(list_position, &free_area[i])
 		{
-			if (list_entry(list_position, page_t, list) == buddy)
+			if (list_entry(list_position, page_t, list) == page_buddy)
 			{
 				freed = true;
 			}
@@ -201,11 +201,11 @@ void buddy_free(void *addr)
 			break;
 		}
 		
-		list_del_init(&buddy->list);
+		list_del_init(&page_buddy->list);
 		
-		if(buddy<page)
+		if(page_buddy<page)
 		{
-			page = buddy;
+			page = page_buddy;
 		}
 		
 	}
