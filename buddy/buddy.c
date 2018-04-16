@@ -70,8 +70,6 @@ char g_memory[1<<MAX_ORDER];
 /* page structures */
 page_t g_pages[(1<<MAX_ORDER)/PAGE_SIZE];
 
-int max_ord = (1<<MAX_ORDER);
-
 /**************************************************************************
  * Public Function Prototypes
  **************************************************************************/
@@ -86,10 +84,22 @@ void split(page_t* page, int order, int requested)
 	{
 		return;
 	}
-	page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, order-1))];
+	page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->addr, (order-1)))];
 	buddy->order = order-1;
 	list_add(&(buddy->list), &free_area[order-1]);
 	split(page, order-1, requested);
+}
+
+int find_order(int size)
+{
+	for (int i = MIN_ORDER; i <= MAX_ORDER; i++)
+	{
+		if ((1<<i) >= size)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
  
  
@@ -135,17 +145,7 @@ void buddy_init()
 void *buddy_alloc(int size)
 {
 	/* TODO: IMPLEMENT THIS FUNCTION */
-	
-	//make sure it is within the bounds that can be allocated
-	int req_order = -1;
-	
-	 for (int i = MIN_ORDER; i <= MAX_ORDER; i++)
-	 {
-		 if((1<<i) >= size)
-		 {
-			 req_order = size;
-		 }
-	 }
+	int req_order = find_order(size);
 	 
 	 if (req_order == -1)
 	 {
@@ -188,7 +188,7 @@ void buddy_free(void *addr)
 		bool freed = false;
 		struct list_head *list_position;
 		
-		list_for_each(list_position, &free_area[index])
+		list_for_each(list_position, &free_area[i])
 		{
 			if (list_entry(list_position, page_t, list) == buddy)
 			{
@@ -196,7 +196,7 @@ void buddy_free(void *addr)
 			}
 		}
 		
-		if (freed)
+		if (!freed)
 		{
 			break;
 		}
